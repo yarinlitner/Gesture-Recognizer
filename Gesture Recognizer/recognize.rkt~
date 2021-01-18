@@ -1,0 +1,200 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-abbr-reader.ss" "lang")((modname recognize) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor mixed-fraction #f #t none #f () #t)))
+;; A)
+(define v1 (list 7 3))
+;; i)
+(define (get-x v)
+  (first v))
+
+(define (get-y v)
+  (second v))
+
+;; ii)
+(define (translate-gesture g x-offset y-offset)
+  (cond[(empty? (rest g))
+        (list (+ (get-x (first g)) x-offset) (+ (get-y (first g)) y-offset))]
+       [else (list (list (+ (get-x (first g)) x-offset)
+                         (+ (get-y (first g)) y-offset))
+                   (translate-gesture (rest g) x-offset y-offset))]))
+
+(check-expect (translate-gesture v1 3 3) (list 10 6))
+
+;; iii)
+(define (scale-gesture g x-scale y-scale)
+  (cond[(empty? (rest g))
+        (list (* (get-x (first g)) x-scale) (* (get-y (first g)) y-scale))]
+       [else (list (list (* (get-x (first g)) x-scale)
+                         (* (get-y (first g)) y-scale))
+                   (scale-gesture (rest g) x-scale y-scale))]))
+
+;; iv)
+
+(define (gesture->lox gesture)
+  (cond[(empty? (rest gesture)) (cons (first (first gesture)) empty)]
+       [else (cons (first (first gesture)) (gesture->lox (rest gesture)))]))
+(define (gesture->loy gesture)
+  (cond[(empty? (rest gesture)) (cons (second (first gesture)) empty)]
+       [else (cons (second (first gesture)) (gesture->loy (rest gesture)))]))
+(define (largest nums)
+  (cond[(empty? (rest nums)) (first nums)]
+       [(> (first nums) (largest (rest nums))) (first nums)]
+       [else (largest (rest nums))]))
+(define (smallest nums)
+  (cond[(empty? (rest nums)) (first nums)]
+       [(< (first nums) (smallest (rest nums))) (first nums)]
+       [else (smallest (rest nums))]))
+(define (get-b-box gesture)
+  (list (list (smallest (gesture->lox gesture))
+              (smallest (gesture->loy gesture)))
+        (list (largest (gesture->lox gesture))
+              (largest (gesture->loy gesture)))))
+
+(define mygest (list (list 100 0) (list 200 100) (list 100 200)
+(list 0 100) (list 100 50)))
+
+(check-expect (gesture->lox mygest) (list 100 200 100 0 100))
+ 
+(check-expect (gesture->loy mygest) (list 0 100 200 100 50))  
+(define mygest1 (list (list 100 0) (list 200 100) (list 100 200) (list 0 100)
+                      (list 100 0)))
+(check-expect (get-b-box mygest1) (list (list 0 0) (list 200 200)))
+
+;; B)
+
+(define (euclidean p1 p2)
+  (sqrt (expt (- (get-x p2) (get-x p1)) 2)
+        (expt (- (get-y p2) (get-y p1)) 2)))
+
+(define (gesture-length gesture)
+  (cond[(empty? (rest gesture)) 0]
+       [else (+ (euclidean (first gesture) (second gesture))
+                (rest (gesture-length gesture)))]))
+                                        
+
+
+;; ii)
+
+(define (get-points g lon)
+  (cond[(empty? (rest lon)) (cons (find (indexer g 0) (first lon)) empty)]
+       [else (cons (find (indexer g 0) (first lon)) (get-points g (rest lon)))]))
+
+(define (indexer g i)
+  (cond[(empty? (rest g))
+        (cons (list (first g) i) empty)]
+       [else (cons (list (first g) i) (indexer (rest g) (add1 i)))]))
+
+(define (find g i)
+  (cond[(empty? (rest g)) (first (first g))]
+       [(= (second (first g)) i) (first (first g))]
+       [else (find (rest g) i)]))
+
+(define mygest2 (list (list 100 0) (list 200 100) (list 100 200)
+(list 0 100) (list 100 50)))
+
+(check-expect (get-points mygest2 (list 0 0 2 4 4))
+(list (list 100 0) (list 100 0) (list 100 200) (list 100 50)
+(list 100 50)))                       
+
+;; C)
+
+
+;; i)
+(define (five-sample g)
+  (get-points g (list 0
+                      (sub1 (floor (* 0.25 (length g))))
+                      (sub1 (floor (* 0.5 (length g))))
+                      (sub1 (floor (* 0.75 (length g))))
+                      (sub1 (length g)))))
+
+(check-expect (five-sample mygest2) (list (list 100 0)
+                                          (list 100 0)
+                                          (list 200 100)
+                                          (list 100 200)
+                                          (list 100 50)))
+;; ii)
+(define (move-and-scale g x-scale y-scale)
+  (scale (translate g (* -1 (first (first (get-b-box g))))
+                      (* -1 (second (first (get-b-box g)))))
+         x-scale y-scale))
+
+;; iii)
+(define min-width 30)
+(define min-height 30)
+(define norm-size 200)
+
+(define (dx g)
+  (- (first (first (get-b-box g)))
+     (first (second (get-b-box)))))
+
+(define (dy g)
+  (- (second (first (get-b-box g)))
+     (second (second (get-b-box)))))
+  
+(define (normalize-gesture g)
+  (cond[(and (< (dx g) (min-width)) (< (dy g) (min-height)))
+        (move-and-scale g 1 1)]
+       [(< (dx g) min-width)
+        (move-and-scale g 1 (/ norm-size (dy g)))]
+       [(< (dy g) min-height)
+        (move-and-scale g (/ norm-size (dx g)) 1)]
+       [else
+        (move-and-scale g (/ norm-size (dx g)) (/ norm-size (dy g)))]))
+
+;; iv)
+(define (geometric-5match g1 g2)
+  (d-avg (normalize-gesture (five-sample g1))
+         (normalize-gesture (five-sample g2))))
+
+(define (dist p1 p2)
+  (sqrt (+ (expt (get-x g1) 2) (expt (get-y p2) 2))))
+
+(define (d-avg g1 g2)
+  (cond[(empty? (rest g1)) (dist (first g1) (first g2))]
+       [else (+ (dist (first g1) (first g2)) (d-avg (rest g1) (rest g2)))])) 
+        
+;; v)
+
+(define (five-point-rec g temp)
+  (cond[(empty? (rest template)) (first (first temp))]
+       [(< (geometric-5match g (first temp)) (five-point-rec g (rest temp)))
+        (first (first temp))]
+       [else (five-point-rec g (rest temp))]))
+
+;; d)
+(define (sub-sample g k)
+  (get-points g (cond[(list 0
+                      (sub1 (floor (* 0.25 (length g))))
+                      (sub1 (floor (* 0.5 (length g))))
+                      (sub1 (floor (* 0.75 (length g))))
+                      (sub1 (length g)))))
+
+(define (sub-sample g k)
+  (cond[(= k 0) (cons 0 empty)]
+       [else (cons (sub1 (floor (/ k (length g)))) (sub-sample g (sub1 k)))])) 
+
+(define (geometric-match g1 g2 k)
+  (d-avg (normalize-gesture (sub-sample g1 k))
+         (normalize-gesture (sub-sample g2 k))))
+
+(define (k-point-rec g temp k)
+  (cond[(empty? (rest template)) (first (first temp))]
+       [(< (geometric-match g (first temp) k) (k-point-rec g (rest temp) k))
+        (first (first temp))]
+       [else (k-point-rec g (rest temp) k)]))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+         
